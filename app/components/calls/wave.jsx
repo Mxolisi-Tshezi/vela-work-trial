@@ -32,17 +32,25 @@ const formWaveSurferOptions = (ref) => ({
   },
 });
 
-export default function Player({ url, wavesurfer, transcriptRef, timestamps }) {
+export default function Player({ 
+  url, 
+  wavesurfer, 
+  transcriptRef, 
+  timestamps, 
+  redactedTimestamps = [],
+  showRedactions = true 
+}) {
   let created = false;
   const waveformRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const gainNodeRef = useRef(null);
 
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0.0);
+  const [currentTime, setCurrentTime] = useState(0);
 
   useEffect(() => {
-    console.log(waveformRef?.current);
     if (url && waveformRef?.current && !wavesurfer.current && !created) {
-      console.log("creating");
       create();
       created = true;
     }
@@ -55,6 +63,40 @@ export default function Player({ url, wavesurfer, transcriptRef, timestamps }) {
     };
   }, []);
 
+  // Handle muting for redacted timestamps
+  useEffect(() => {
+    if (!wavesurfer.current || !redactedTimestamps || !gainNodeRef.current) return;
+
+    const handleAudioProcess = () => {
+      if (!wavesurfer.current || !wavesurfer.current.isPlaying()) return;
+      
+      const currentTimeMs = wavesurfer.current.getCurrentTime() * 1000;
+      setCurrentTime(currentTimeMs);
+
+      // Check if the current time falls within any redacted timestamp
+      if (showRedactions) {
+        const shouldMute = redactedTimestamps.some(
+          timestamp => currentTimeMs >= timestamp.start && currentTimeMs <= timestamp.end
+        );
+        
+        // Set gain to 0 (muted) if in redacted section, otherwise set to 1 (normal volume)
+        gainNodeRef.current.gain.value = shouldMute ? 0 : 1;
+      } else {
+        // Always unmuted when redactions are hidden
+        gainNodeRef.current.gain.value = 1;
+      }
+    };
+
+    // Add audio process event listener
+    wavesurfer.current.on('audioprocess', handleAudioProcess);
+
+    return () => {
+      if (wavesurfer.current) {
+        wavesurfer.current.un('audioprocess', handleAudioProcess);
+      }
+    };
+  }, [wavesurfer.current, redactedTimestamps, showRedactions]);
+
   const create = async () => {
     const WaveSurfer = (await import("wavesurfer.js")).default;
 
@@ -64,6 +106,13 @@ export default function Player({ url, wavesurfer, transcriptRef, timestamps }) {
     wavesurfer.current.load(url);
 
     wavesurfer.current.on("ready", function () {
+      // Set up audio context and gain node for redaction
+      audioContextRef.current = wavesurfer.current.getBackend().ac;
+      gainNodeRef.current = audioContextRef.current.createGain();
+      
+      // Connect wavesurfer source to our gain node, then to destination
+      wavesurfer.current.getBackend().setFilters([gainNodeRef.current]);
+      
       setProgress(
         (wavesurfer.current.getCurrentTime() /
           wavesurfer.current.getDuration()) *
@@ -75,6 +124,8 @@ export default function Player({ url, wavesurfer, transcriptRef, timestamps }) {
       if (wavesurfer.current.isPlaying()) {
         let wavTimestamp = wavesurfer.current.getCurrentTime();
         setProgress((wavTimestamp / wavesurfer.current.getDuration()) * 100);
+        setCurrentTime(wavTimestamp * 1000);
+        
         let currentTimestamp = timestamps.filter(
           (stamp) =>
             wavTimestamp * 1000 >= stamp.start &&
@@ -86,7 +137,8 @@ export default function Player({ url, wavesurfer, transcriptRef, timestamps }) {
             `#stamp-${CSS.escape(currentTimestamp[0].start)}`
           );
           if (element) {
-            element?.scrollIntoView(true, { behavior: "smooth" });
+            // Use smooth scrolling for better user experience
+            element?.scrollIntoView({ behavior: "smooth", block: "nearest" });
             let otherBubbles = element?.parentElement?.children;
             [...otherBubbles].forEach(function (elem) {
               elem.firstElementChild?.classList.remove("highlight");
@@ -101,9 +153,11 @@ export default function Player({ url, wavesurfer, transcriptRef, timestamps }) {
           let otherBubbles = transcriptRef.current?.querySelector(
             `#stamp-${CSS.escape(timestamps[0].start)}`
           )?.parentElement?.children;
-          [...otherBubbles].forEach(function (elem) {
-            elem.firstElementChild?.classList.remove("highlight");
-          });
+          if (otherBubbles) {
+            [...otherBubbles].forEach(function (elem) {
+              elem.firstElementChild?.classList.remove("highlight");
+            });
+          }
         }
       }
     });
@@ -119,11 +173,58 @@ export default function Player({ url, wavesurfer, transcriptRef, timestamps }) {
           100
       );
     });
+    
+    // Handle play/pause to update state
+    wavesurfer.current.on("play", function() {
+      setPlaying(true);
+    });
+    
+    wavesurfer.current.on("pause", function() {
+      setPlaying(false);
+    });
+  };
+
+  const handlePlayPause = () => {
+    if (wavesurfer.current) {
+      wavesurfer.current.playPause();
+    }
+  };
+
+  const handleForward = () => {
+    if (wavesurfer.current) {
+      wavesurfer.current.skip(10);
+    }
+  };
+
+  const handleRewind = () => {
+    if (wavesurfer.current) {
+      wavesurfer.current.skip(-10);
+    }
   };
 
   return (
     <div className="pt-0">
       <div id="waveform" ref={waveformRef} />
+      <div className="flex justify-center items-center mt-2 space-x-4">
+        <button 
+          onClick={handleRewind}
+          className="p-2 hover:bg-vela-background-card rounded-full"
+        >
+          <RiReplay10Fill size={24} />
+        </button>
+        <button 
+          onClick={handlePlayPause}
+          className="p-2 hover:bg-vela-background-card rounded-full"
+        >
+          {playing ? <FaPause size={24} /> : <FaPlay size={24} />}
+        </button>
+        <button 
+          onClick={handleForward}
+          className="p-2 hover:bg-vela-background-card rounded-full"
+        >
+          <RiForward10Fill size={24} />
+        </button>
+      </div>
     </div>
   );
 }

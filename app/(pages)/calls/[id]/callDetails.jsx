@@ -1,6 +1,6 @@
 "use client";
-import { MdOutlineSearch, MdClose } from "react-icons/md";
-import { useState, useRef } from "react";
+import { MdOutlineSearch, MdClose, MdVisibility, MdVisibilityOff } from "react-icons/md";
+import { useState, useRef, useEffect } from "react";
 import { Empty } from "antd";
 import moment from "moment-timezone";
 
@@ -17,10 +17,52 @@ export default function CallInfo({ call, url }) {
 
   const [showTranslation, setShowTranslation] = useState(false);
   const [search, setSearch] = useState("");
+  const [showRedactions, setShowRedactions] = useState(true);
+  const [redactedTimestamps, setRedactedTimestamps] = useState([]);
+
+  // Fetch organization settings to determine which entities to redact
+  useEffect(() => {
+    if (call.organisation && call.segments) {
+      const orgRedactionSettings = call.organisation.redaction?.entities || {};
+      const orgPlaceholders = getOrgPlaceholders(orgRedactionSettings);
+      
+      // Get timestamps for all redacted content
+      const timestamps = getRedactedTimestamps(call.segments, orgRedactionSettings, orgPlaceholders);
+      setRedactedTimestamps(timestamps);
+    }
+  }, [call]);
+
+  // Helper function to get placeholders for organization settings
+  const getOrgPlaceholders = (redactionSettings) => {
+    const redactable = {
+      creditCard: "<CREDIT_CARD>",
+      ibanCode: "<IBAN_CODE>",
+      person: "<PERSON>",
+      location: "<LOCATION>",
+      crypto: "<CRYPTO>",
+      phoneNumber: "<PHONE_NUMBER>",
+      email: "<EMAIL_ADDRESS>",
+      nrp: "<NRP>",
+      ipAddress: "<IP_ADDRESS>",
+      dateTime: "<DATE_TIME>",
+      url: "<URL>",
+      idNumber: "<ID_NUMBER>",
+    };
+
+    const orgEntities = redactionSettings
+      ? Object.entries(redactionSettings).filter(([key, value]) => value)
+      : [];
+
+    return orgEntities.map(([key, value]) => redactable[key]);
+  };
+
+  const toggleRedactions = () => {
+    setShowRedactions(!showRedactions);
+  };
 
   return (
     <>
-      <div className="flex  pt-3 h-56">
+      <div className="flex pt-3 h-56">
         <div className="pr-5 w-3/5">
           <p className="underline font-semibold title ">audio</p>
           <div className="card floating !py-1.5 !mt-0 !w-full">
@@ -32,12 +74,13 @@ export default function CallInfo({ call, url }) {
                 timestamps={call.segments.map((segment) => {
                   return { start: segment.start, end: segment.end };
                 })}
+                redactedTimestamps={redactedTimestamps}
+                showRedactions={showRedactions}
               />
             ) : (
               <div className="h-32 flex items-center justify-center">
                 <Empty
                   description={"Audio not available"}
-                  // image={Empty.PRESENTED_IMAGE_SIMPLE}
                   imageStyle={{
                     height: "50px",
                     paddingTop: "5px",
@@ -66,7 +109,25 @@ export default function CallInfo({ call, url }) {
       </div>
       <div className="grid grid-cols-3 grid-rows-1 gap-6 min-h-0 h-full">
         <div className="flex flex-col w-full h-full max-w-xl">
-          <p className="underline font-semibold title">Transcript</p>
+          <div className="flex justify-between items-center">
+            <p className="underline font-semibold title">Transcript</p>
+            <button
+              onClick={toggleRedactions}
+              className="px-3 py-1 text-center border rounded-full focus:outline-none transition-colors duration-300 text-sm tracking-wide flex items-center gap-2 hover:bg-vela-orange hover:text-vela-darkest-blue"
+            >
+              {showRedactions ? (
+                <>
+                  <MdVisibility size={18} />
+                  <span>Reveal Redacted Entities</span>
+                </>
+              ) : (
+                <>
+                  <MdVisibilityOff size={18} />
+                  <span>Hide Redacted Entities</span>
+                </>
+              )}
+            </button>
+          </div>
           <div className="flex justify-between text-sm">
             <div className="relative flex items-center w-full">
               <input
@@ -136,11 +197,14 @@ export default function CallInfo({ call, url }) {
                     key={index}
                     speaker={segment.speaker}
                     sentiment={segment.emotion}
-                    text={segment.redaction}
+                    text={showRedactions ? segment.redaction : segment.transcription}
                     translation={segment.translation}
                     language={segment.language}
                     timestamp={segment.start}
                     showTranslation={showTranslation}
+                    words={segment.words}
+                    currentTime={wavesurfer.current?.getCurrentTime() * 1000 || 0}
+                    segmentStart={segment.start}
                     onClick={() => {
                       wavesurfer.current?.setTime(segment.start / 1000);
                     }}
