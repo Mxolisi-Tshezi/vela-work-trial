@@ -32,13 +32,13 @@ const formWaveSurferOptions = (ref) => ({
   },
 });
 
-export default function Player({ 
-  url, 
-  wavesurfer, 
-  transcriptRef, 
-  timestamps, 
+export default function Player({
+  url,
+  wavesurfer,
+  transcriptRef,
+  timestamps,
   redactedTimestamps = [],
-  showRedactions = true 
+  showRedactions = true
 }) {
   let created = false;
   const waveformRef = useRef(null);
@@ -50,7 +50,9 @@ export default function Player({
   const [currentTime, setCurrentTime] = useState(0);
 
   useEffect(() => {
+    console.log(waveformRef?.current);
     if (url && waveformRef?.current && !wavesurfer.current && !created) {
+      console.log("creating");
       create();
       created = true;
     }
@@ -69,7 +71,7 @@ export default function Player({
 
     const handleAudioProcess = () => {
       if (!wavesurfer.current || !wavesurfer.current.isPlaying()) return;
-      
+
       const currentTimeMs = wavesurfer.current.getCurrentTime() * 1000;
       setCurrentTime(currentTimeMs);
 
@@ -78,7 +80,7 @@ export default function Player({
         const shouldMute = redactedTimestamps.some(
           timestamp => currentTimeMs >= timestamp.start && currentTimeMs <= timestamp.end
         );
-        
+
         // Set gain to 0 (muted) if in redacted section, otherwise set to 1 (normal volume)
         gainNodeRef.current.gain.value = shouldMute ? 0 : 1;
       } else {
@@ -109,14 +111,14 @@ export default function Player({
       // Set up audio context and gain node for redaction
       audioContextRef.current = wavesurfer.current.getBackend().ac;
       gainNodeRef.current = audioContextRef.current.createGain();
-      
+
       // Connect wavesurfer source to our gain node, then to destination
       wavesurfer.current.getBackend().setFilters([gainNodeRef.current]);
-      
+
       setProgress(
         (wavesurfer.current.getCurrentTime() /
           wavesurfer.current.getDuration()) *
-          100
+        100
       );
     });
 
@@ -125,7 +127,7 @@ export default function Player({
         let wavTimestamp = wavesurfer.current.getCurrentTime();
         setProgress((wavTimestamp / wavesurfer.current.getDuration()) * 100);
         setCurrentTime(wavTimestamp * 1000);
-        
+
         let currentTimestamp = timestamps.filter(
           (stamp) =>
             wavTimestamp * 1000 >= stamp.start &&
@@ -170,16 +172,16 @@ export default function Player({
       setProgress(
         (wavesurfer.current.getCurrentTime() /
           wavesurfer.current.getDuration()) *
-          100
+        100
       );
     });
-    
+
     // Handle play/pause to update state
-    wavesurfer.current.on("play", function() {
+    wavesurfer.current.on("play", function () {
       setPlaying(true);
     });
-    
-    wavesurfer.current.on("pause", function() {
+
+    wavesurfer.current.on("pause", function () {
       setPlaying(false);
     });
   };
@@ -206,19 +208,19 @@ export default function Player({
     <div className="pt-0">
       <div id="waveform" ref={waveformRef} />
       <div className="flex justify-center items-center mt-2 space-x-4">
-        <button 
+        <button
           onClick={handleRewind}
           className="p-2 hover:bg-vela-background-card rounded-full"
         >
           <RiReplay10Fill size={24} />
         </button>
-        <button 
+        <button
           onClick={handlePlayPause}
           className="p-2 hover:bg-vela-background-card rounded-full"
         >
           {playing ? <FaPause size={24} /> : <FaPlay size={24} />}
         </button>
-        <button 
+        <button
           onClick={handleForward}
           className="p-2 hover:bg-vela-background-card rounded-full"
         >

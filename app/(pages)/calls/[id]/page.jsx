@@ -14,11 +14,20 @@ export default async function CallPage({ params }) {
   )
     .then((res) => res.json())
     .then((res) => res[0]);
-  console.log(profile);
+  
   const call = await fetch(
     `${process.env.NEXT_PUBLIC_SERVER_URL}/calls/${id}`
   ).then((res) => res.json());
-  console.log(call);
+  
+  // Get organization settings
+  const organization = await fetch(
+    `${process.env.NEXT_PUBLIC_SERVER_URL}/organisations?id=${call.organisation.id}`
+  ).then((res) => res.json())
+    .then((res) => res[0] || call.organisation);
+  
+  // Attach organization settings to call data
+  call.organisation = organization;
+  
   const url = call.audio_path;
 
   return (
@@ -35,7 +44,7 @@ export default async function CallPage({ params }) {
   );
 }
 
-function findPlaceholdersToReveal(
+export function findPlaceholdersToReveal(
   sentence,
   redactionSettings,
   orgPlaceholders
@@ -45,7 +54,8 @@ function findPlaceholdersToReveal(
   let matches = sentence.match(regex) || [];
   return matches.filter((match) => orgPlaceholders.includes(match));
 }
-const getOrgPlaceholders = (redactionSettings) => {
+
+export function getOrgPlaceholders(redactionSettings) {
   const redactable = {
     creditCard: "<CREDIT_CARD>",
     ibanCode: "<IBAN_CODE>",
@@ -66,28 +76,25 @@ const getOrgPlaceholders = (redactionSettings) => {
     : [];
 
   return orgEntities.map(([key, value]) => redactable[key]);
-};
+}
 
-function revealInfo(original, redacted, placeholders, words) {
+export function revealInfo(original, redacted, placeholders, words) {
   // Split the original and redacted strings into arrays of words
-  // logger.info(`OGs: ${original} - ${redacted}`);
   let originalWords = original.split(" ").filter(Boolean);
   let redactedWords = redacted.split(" ").filter(Boolean);
   originalWords = JSON.parse(JSON.stringify(originalWords));
   redactedWords = JSON.parse(JSON.stringify(redactedWords));
-  // logger.info(`lists: ${originalWords} - ${redactedWords}`);
+  
   let testOW = [];
   for (let i = 0; i < originalWords.length; i++) {
     if (originalWords[i].length > 0) {
       testOW.push(originalWords[i]);
     }
   }
-  // logger.info(`testOW: ${testOW}`);
 
   // Create an object to store the substitutions
   let substitutes = {};
-  // Create a regex pattern to match the placeholder
-
+  
   // Initialize an index to keep track of where we are in the original string
   let originalIndex = 0;
 
@@ -120,7 +127,6 @@ function revealInfo(original, redacted, placeholders, words) {
     } else {
       originalIndex++;
     }
-    // console.log(redactedWords);
   }
   // Replace the placeholders in the original string
   let updatedString = Object.entries(substitutes).filter(([key, value]) => {
@@ -132,15 +138,15 @@ function revealInfo(original, redacted, placeholders, words) {
       values.push(i);
     }
   });
-  // console.log(updatedString);
+  
   return values;
 }
 
-const getRedactedTimestamps = (
+export function getRedactedTimestamps(
   segments,
   redactionSettings,
   orgPlaceholders
-) => {
+) {
   let redactedTimestamps = [];
   segments.forEach((segment) => {
     if (segment.redaction && segment.words.length > 0) {
@@ -152,9 +158,7 @@ const getRedactedTimestamps = (
 
       let wordSegments = revealInfo(
         segment.transcription,
-
         segment.redaction,
-
         placeholders
       );
 
@@ -167,25 +171,15 @@ const getRedactedTimestamps = (
             segment.end
           );
           redactedTimestamps = redactedTimestamps.concat(timestamps);
-          // if (segment?.words[value[0]]?.start) {
-          //   redactedTimestamps.push({
-          //     start:
-          //       segment?.words[value[0]]?.start * 1000 + segment.start - 500,
-          //     end:
-          //       segment?.words[value[value.length - 1]]?.end * 1000 +
-          //       segment.start +
-          //       500,
-          //   });
-          // }
         }
       });
     }
   });
 
   return redactedTimestamps;
-};
+}
 
-function getMuteTimestamps(
+export function getMuteTimestamps(
   words,
   muteIndexes,
   sentenceStartTimestamp,
