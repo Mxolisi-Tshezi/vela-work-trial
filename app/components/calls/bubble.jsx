@@ -84,12 +84,8 @@ export default function VelaBubble({
     if (!words || words.length === 0) {
       return <p className="!py-0.5 !px-2 !m-0 !text-sm">{textToShow}</p>;
     }
-
-    // Create a version of the text split into words
-    // This is complex because we need to match the words array with the actual displayed text
-    // which might be redacted or translated
     
-    // Simple implementation - split by spaces
+    //split by spaces
     const textWords = textToShow.split(/\s+/).filter(w => w.length > 0);
     
     return (

@@ -465,3 +465,36 @@ body,
   flex-wrap: wrap;
   gap: 140px;
 }
+
+/* Word level highlighting styles */
+.speech-word {
+  transition: all 0.2s ease;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.word-highlight {
+  background-color: var(--vela-orange);
+  color: var(--vela-darkest-blue);
+  font-weight: 500;
+  padding: 1px 2px;
+  border-radius: 3px;
+}
+
+/* Smooth animation for better UX */
+.highlight {
+  transition: all 0.3s ease;
+}
+
+/* Confidence level styles */
+.word-high-confidence {
+  border-bottom: 2px solid var(--vela-green);
+}
+
+.word-medium-confidence {
+  border-bottom: 2px solid var(--vela-yellow);
+}
+
+.word-low-confidence {
+  border-bottom: 2px solid var(--vela-red);
+}
