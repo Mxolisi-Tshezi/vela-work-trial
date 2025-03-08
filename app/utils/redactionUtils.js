@@ -1,6 +1,6 @@
 /**
  * redacted timestamps from a segment
- * Tthis has better accuracy than the previous approaches
+ * Tthis has better accuracy than the previous approach
  */
 export function generateRedactedTimestamps(segment) {
     if (!segment.redaction || !segment.transcription || !segment.words || segment.words.length === 0) {
